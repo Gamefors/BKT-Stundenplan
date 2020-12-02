@@ -141,12 +141,17 @@ function lessons({ route }) {
 
 
 function timetable(weeks) {
+  var afternoon = 0
   let skip = 0
   let currDate = new Date();
   let calendarWeek = 1;
   let currDay = currDate.getDay()
+  var currHours = currDate.getHours()
   if(currDay == 0 || currDay == 6){
     skip++
+  }
+  if(currHours > 16){
+    afternoon++
   }
   if ((getCalendarWeek(currDate) + skip) % 2 === 0) calendarWeek = 0;
   let week = weeks[calendarWeek]
@@ -154,7 +159,7 @@ function timetable(weeks) {
   return (
     <NavigationContainer>
       <StatusBar hidden={true} />
-      <Tab.Navigator initialRouteName={daysForIndex[currDate.getDay() - 1]} tabBarOptions={{
+      <Tab.Navigator initialRouteName={daysForIndex[(currDate.getDay() - 1) + afternoon]} tabBarOptions={{
         scrollEnabled: true,
         activeTintColor: "#7289DA",
         inactiveTintColor: "#99AAB5",
