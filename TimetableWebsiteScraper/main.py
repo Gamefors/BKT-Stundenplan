@@ -11,37 +11,53 @@ from mysql.connector.errors import IntegrityError
 
 class bktSTD:
 
-    def checkForMissingRoomsOrSubjects(self):
-        print("Checking for missing rooms or subjects...")
+#region helper
+    def getCalendarWeek(self):
+        dateOfMonday = self.driver.find_element_by_xpath("/html/body/table[2]/tbody/tr[1]/th[3]").get_attribute("innerHTML").split(";")[2].split(".")
+        if(datetime.date(datetime.date.today().year, int(dateOfMonday[1]), int(dateOfMonday[0])).isocalendar()[1] % 2 == 0):
+            return 0
+        else:
+            return 1
 
-        sqlMissingSubjects = "INSERT INTO Subjects (name, ph) VALUES (%s, %s)"
-        sqlMissingRooms = "INSERT INTO Rooms (name, ph) VALUES (%s, %s)"
-
+    def fetchRoomsAndSubjects(self):
         self.cursor.execute("SELECT * FROM Rooms")
         self.rooms = self.cursor.fetchall()
         self.cursor.execute("SELECT * FROM Subjects")
         self.subjects = self.cursor.fetchall()
-        localLessonsData = json.loads(self.lessonsData)
+        for dbRoom in self.rooms:
+            self.dbRooms.append(dbRoom[1])
+        for dbSubject in self.subjects:
+            self.dbSubjects.append(dbSubject[1])
 
-        dbRooms = []
-        dbSubjects = []
+    def dbLookup(self, type, text):
+       returnVal = None
+       if(type == "subject"):
+           for subject in self.subjects:
+               if(subject[1] == text):
+                   returnVal = subject[0]
+       else:
+           for room in self.rooms:
+               if(room[1] == text):
+                   returnVal = room[0]
+       return returnVal
+#endregion
+
+    def checkForMissingRoomsOrSubjects(self):
+        print("Checking for missing rooms or subjects...")
+        self.fetchRoomsAndSubjects()
+        localLessonsData = json.loads(self.lessonsData)
 
         missingRooms = []
         missingSubjects = []
-
-        for dbRoom in self.rooms:
-            dbRooms.append(dbRoom[1])
-
-        for dbSubject in self.subjects:
-            dbSubjects.append(dbSubject[1])
-
+        
         for week in localLessonsData:
             for day in localLessonsData[week]:
                 for lesson in localLessonsData[week][day]:
-                    if(lesson['Room'] not in dbRooms and lesson['Room'] not in missingRooms):
+                    if(lesson['Room'] not in self.dbRooms and lesson['Room'] not in missingRooms):
                         missingRooms.append(lesson['Room'])
-                    if(lesson['Name'] not in dbSubjects and lesson['Name'] not in missingSubjects):
+                    if(lesson['Name'] not in self.dbSubjects and lesson['Name'] not in missingSubjects):
                         missingSubjects.append(lesson['Name'])
+                        
         if(len(missingRooms) == 0 and len(missingSubjects) == 0):
             print("No missing rooms or subjects found.")                
         else:
@@ -53,26 +69,14 @@ class bktSTD:
             for missingSubject in missingSubjects:
                 mS.append((missingSubject,0))
                 print("Subject: [" + missingSubject + "] is missing on db")
-            self.cursor.executemany(sqlMissingRooms, mR)
+            self.cursor.executemany("INSERT INTO Rooms (name, ph) VALUES (%s, %s)", mR)
             self.db.commit()
-            print("Upload: " + str(self.cursor.rowcount) +
-              " record(s) uploaded for missing rooms.")
-            self.cursor.executemany(sqlMissingSubjects, mS)
+            print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for missing rooms.")
+            self.cursor.executemany("INSERT INTO Subjects (name, ph) VALUES (%s, %s)", mS)
             self.db.commit()
-            print("Upload: " + str(self.cursor.rowcount) +
-              " record(s) uploaded for missing subjects.")
+            print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for missing subjects.")
 
-    def dbLookup(self, type, text):
-        returnVal = 999
-        if(type == "subject"):
-            for subject in self.subjects:
-                if(subject[1] == text):
-                    returnVal = subject[0]
-        else:
-            for room in self.rooms:
-                if(room[1] == text):
-                    returnVal = room[0]
-        return returnVal
+        self.fetchRoomsAndSubjects()
 
     def uploadDataToDB(self):
         self.db = mysql.connector.connect(
@@ -88,20 +92,12 @@ class bktSTD:
 
         self.checkForMissingRoomsOrSubjects()
 
-       
-        
-
-        valEven = []
-        valOdd = [] 
-
-        self.cursor.execute("SELECT * FROM Rooms")
-        self.rooms = self.cursor.fetchall()
-        self.cursor.execute("SELECT * FROM Subjects")
-        self.subjects = self.cursor.fetchall()
+        EvenWeekLessons = []
+        OddWeekLessons = [] 
 
         for day in self.lessons[0]:
             for lesson in day:
-                valEven.append(
+                EvenWeekLessons.append(
                     (
                         self.dbLookup("subject", lesson["Name"]),
                         self.dbLookup("room", lesson["Room"])
@@ -110,24 +106,20 @@ class bktSTD:
 
         for day in self.lessons[1]:
             for lesson in day:
-                valOdd.append(
+                OddWeekLessons.append(
                     (
                         self.dbLookup("subject", lesson["Name"]),
                         self.dbLookup("room", lesson["Room"])
                     )
                 )
         
-        sqlEven = "INSERT INTO EvenWeekLessons (subject, room) VALUES (%s, %s)"
-        sqlOdd = "INSERT INTO OddWeekLessons (subject, room) VALUES (%s, %s)"
+        self.cursor.executemany("INSERT INTO EvenWeekLessons (subject, room) VALUES (%s, %s)", EvenWeekLessons)
+        self.db.commit()
+        print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for evenWeek.")
 
-        self.cursor.executemany(sqlEven, valEven)
+        self.cursor.executemany("INSERT INTO OddWeekLessons (subject, room) VALUES (%s, %s)", OddWeekLessons)
         self.db.commit()
-        print("Upload: " + str(self.cursor.rowcount) +
-            " record(s) uploaded for evenWeek.")
-        self.cursor.executemany(sqlOdd, valOdd)
-        self.db.commit()
-        print("Upload: " + str(self.cursor.rowcount) +
-            " record(s) uploaded for oddWeek.")
+        print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for oddWeek.")
 
     def parseLesson(self, type, data, day):
         if(type == "single"):
@@ -269,17 +261,6 @@ class bktSTD:
         # endregion
         loginPassword.send_keys(Keys.RETURN)
 
-    def getCalendarWeek(self):
-        mondayDate = self.driver.find_element_by_xpath(
-            "/html/body/table[2]/tbody/tr[1]/th[3]").get_attribute("innerHTML").split(";")[2].split(".")
-
-        calendarWeek = datetime.date(datetime.date.today().year, int(
-            mondayDate[1]), int(mondayDate[0])).isocalendar()[1]
-        if(calendarWeek % 2 == 0):
-            return 0
-        else:
-            return 1
-
     def __init__(self):
         chrome_options = Options()  
         chrome_options.add_argument("--headless")
@@ -295,8 +276,12 @@ class bktSTD:
             
         self.login()
 
-        self.calendarWeek = self.getCalendarWeek()
         self.lessons = [[[], [], [], [], []], [[], [], [], [], []]]
+        self.dbRooms = []
+        self.dbSubjects = []
+
+        self.calendarWeek = self.getCalendarWeek()
+        
         print("Parsing first week...")
         self.parseTimetable()
 
