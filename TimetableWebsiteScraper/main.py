@@ -1,14 +1,66 @@
 import datetime
 import json
 import mysql.connector
+import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.chrome.options import Options
-
+from mysql.connector.errors import IntegrityError
 
 class bktSTD:
+
+    def checkForMissingRoomsOrSubjects(self):
+        print("Checking for missing rooms or subjects...")
+
+        sqlMissingSubjects = "INSERT INTO Subjects (name, ph) VALUES (%s, %s)"
+        sqlMissingRooms = "INSERT INTO Rooms (name, ph) VALUES (%s, %s)"
+
+        self.cursor.execute("SELECT * FROM Rooms")
+        self.rooms = self.cursor.fetchall()
+        self.cursor.execute("SELECT * FROM Subjects")
+        self.subjects = self.cursor.fetchall()
+        localLessonsData = json.loads(self.lessonsData)
+
+        dbRooms = []
+        dbSubjects = []
+
+        missingRooms = []
+        missingSubjects = []
+
+        for dbRoom in self.rooms:
+            dbRooms.append(dbRoom[1])
+
+        for dbSubject in self.subjects:
+            dbSubjects.append(dbSubject[1])
+
+        for week in localLessonsData:
+            for day in localLessonsData[week]:
+                for lesson in localLessonsData[week][day]:
+                    if(lesson['Room'] not in dbRooms and lesson['Room'] not in missingRooms):
+                        missingRooms.append(lesson['Room'])
+                    if(lesson['Name'] not in dbSubjects and lesson['Name'] not in missingSubjects):
+                        missingSubjects.append(lesson['Name'])
+        if(len(missingRooms) == 0 and len(missingSubjects) == 0):
+            print("No missing rooms or subjects found.")                
+        else:
+            mR = []
+            mS = []
+            for missingRoom in missingRooms:
+                mR.append((missingRoom,0))
+                print("Room: [" + missingRoom + "] is missing on db")
+            for missingSubject in missingSubjects:
+                mS.append((missingSubject,0))
+                print("Subject: [" + missingSubject + "] is missing on db")
+            self.cursor.executemany(sqlMissingRooms, mR)
+            self.db.commit()
+            print("Upload: " + str(self.cursor.rowcount) +
+              " record(s) uploaded for missing rooms.")
+            self.cursor.executemany(sqlMissingSubjects, mS)
+            self.db.commit()
+            print("Upload: " + str(self.cursor.rowcount) +
+              " record(s) uploaded for missing subjects.")
 
     def dbLookup(self, type, text):
         returnVal = 999
@@ -20,18 +72,6 @@ class bktSTD:
             for room in self.rooms:
                 if(room[1] == text):
                     returnVal = room[0]
-        if(returnVal == 999):
-            self.missingRoomOrSubject = True
-            if(type == "room"):
-                if(text != self.lastRoom):
-                    self.missingRooms.append((text,0))
-                    self.lastRoom = text
-            elif(type == "subject"):
-                if(text != self.lastSubject):
-                    self.missingSubjects.append((text,0))
-                    self.lastSubject = text
-            else:
-                print("ERROR uknown type in dblookup neither room or subject")
         return returnVal
 
     def uploadDataToDB(self):
@@ -41,26 +81,23 @@ class bktSTD:
             password="bktStd",
             database="bktStd"
         )
-
         self.cursor = self.db.cursor()
 
-        truncateEven = "TRUNCATE EvenWeekLessons"
-        truncateOdd = "TRUNCATE OddWeekLessons"
-        self.cursor.execute(truncateEven)
-        self.cursor.execute(truncateOdd)
+        self.cursor.execute("TRUNCATE EvenWeekLessons")
+        self.cursor.execute("TRUNCATE OddWeekLessons")
+
+        self.checkForMissingRoomsOrSubjects()
+
+       
+        
+
+        valEven = []
+        valOdd = [] 
 
         self.cursor.execute("SELECT * FROM Rooms")
         self.rooms = self.cursor.fetchall()
         self.cursor.execute("SELECT * FROM Subjects")
         self.subjects = self.cursor.fetchall()
-
-        sqlEven = "INSERT INTO EvenWeekLessons (subject, room) VALUES (%s, %s)"
-        sqlOdd = "INSERT INTO OddWeekLessons (subject, room) VALUES (%s, %s)"
-        sqlMissingSubjects = "INSERT INTO Subjects (name, ph) VALUES (%s, %s)"
-        sqlMissingRooms = "INSERT INTO Rooms (name, ph) VALUES (%s, %s)"
-
-        valEven = []
-        valOdd = [] 
 
         for day in self.lessons[0]:
             for lesson in day:
@@ -79,29 +116,18 @@ class bktSTD:
                         self.dbLookup("room", lesson["Room"])
                     )
                 )
-
-        if(len(self.missingSubjects) > 0):
-            self.cursor.executemany(sqlMissingSubjects, self.missingSubjects)
-            self.db.commit()
-            print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for missingSubjects.")
-
-        if(len(self.missingRooms) > 0):
-            self.cursor.executemany(sqlMissingRooms, self.missingRooms)
-            self.db.commit()
-            print("Upload: " + str(self.cursor.rowcount) + " record(s) uploaded for missingRooms.")
-
+        
+        sqlEven = "INSERT INTO EvenWeekLessons (subject, room) VALUES (%s, %s)"
+        sqlOdd = "INSERT INTO OddWeekLessons (subject, room) VALUES (%s, %s)"
 
         self.cursor.executemany(sqlEven, valEven)
         self.db.commit()
         print("Upload: " + str(self.cursor.rowcount) +
-              " record(s) uploaded for evenWeek.")
-
+            " record(s) uploaded for evenWeek.")
         self.cursor.executemany(sqlOdd, valOdd)
         self.db.commit()
         print("Upload: " + str(self.cursor.rowcount) +
-              " record(s) uploaded for oddWeek.")
-        
-        
+            " record(s) uploaded for oddWeek.")
 
     def parseLesson(self, type, data, day):
         if(type == "single"):
@@ -255,14 +281,9 @@ class bktSTD:
             return 1
 
     def __init__(self):
-        self.lastRoom = ""
-        self.lastSubject = ""
-        self.missingSubjects = []
-        self.missingRooms = []
-        self.missingRoomOrSubject = False
-
         chrome_options = Options()  
         chrome_options.add_argument("--headless")
+        chrome_options.add_argument('log-level=3')
         
         #on desktop
         self.driver = webdriver.Chrome(options=chrome_options) # for testing
@@ -278,13 +299,12 @@ class bktSTD:
         self.lessons = [[[], [], [], [], []], [[], [], [], [], []]]
         print("Parsing first week...")
         self.parseTimetable()
-        print("Finished parsing first week.")
 
         self.driver.find_element_by_name("btnWoche").click()
         self.calendarWeek = 1 - self.calendarWeek
         print("Parsing second week...")
         self.parseTimetable()
-        print("Finished parsing second week.")
+        print("Finished parsing weeks.")
 
         self.driver.close()
 
