@@ -12,7 +12,7 @@ var db = mysql.createConnection({
   
   db.connect(function(err) {
     if (err) throw err;
-    console.log("Succesfully connected to database.");
+    console.log("Successfully connected to database.");
   });
 
 app.get('/lessonData', (request, response) => {
@@ -71,6 +71,7 @@ app.get('/lessonData', (request, response) => {
                     lessonsData.OddWeek.Friday.push(lesson)
                 }
             })
+            response.setHeader("Access-Control-Allow-Origin", "*")
             response.json(lessonsData)
         })
     })
