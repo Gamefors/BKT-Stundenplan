@@ -101,7 +101,7 @@
 		}
 
 		const Http = new XMLHttpRequest();
-		const url='http://localhost:3000/lessonData';
+		const url='http://gmcr-network.de:3000/lessonData';
 		Http.open("GET", url);
 		Http.send();
 
