@@ -3,17 +3,34 @@ var mysql = require('mysql');
 const app = express()
 const port = 3000
 
-var db = mysql.createConnection({
-    host: "gmcr-network.de",
-    user: "bktStd",
-    password: "bktStd",
-    database: "bktStd"
-  });
-  
-  db.connect(function(err) {
-    if (err) throw err;
-    console.log("Successfully connected to database.");
-  });
+var db;
+
+function connect(){
+    db = mysql.createConnection({
+        host: "gmcr-network.de",
+        user: "bktStd",
+        password: "bktStd",
+        database: "bktStd"
+      })
+      db.connect(function(err) {
+        if (err){
+            console.log('error when connecting to db:', err);
+            setTimeout(connect, 2000);
+        }else{
+            console.log(`(Mysql) Successfully connected to db.`);    
+        }
+    });
+    db.on('error', function(err) {
+        if(err.code === 'PROTOCOL_CONNECTION_LOST'){
+            connect();                         
+        }else if (err.code === 'ECONNRESET'){
+            connect();                                
+        }else{
+            throw err; 
+        }
+    });
+}
+connect()
 
 app.get('/lessonData', (request, response) => {
     console.log(`${request.ip} requested lessonData.`);
