@@ -320,3 +320,6 @@ class bktSTD:
 
 
 bktSTD()
+while(True):
+    time.sleep(28800)
+    bktSTD()

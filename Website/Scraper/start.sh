@@ -1,0 +1,1 @@
+screen -dmS Timetable-Scraper -L -Logfile screenLog python3 main.py

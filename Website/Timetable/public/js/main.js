@@ -108,8 +108,21 @@
 		Http.onreadystatechange = (e) => {
 			if (Http.readyState === XMLHttpRequest.DONE) {
 				if (Http.status === 200) {
+					var afternoon = 0
+					let skip = 0
+					let currDate = new Date();
+					let calendarWeek = 1;
+					let currDay = currDate.getDay()
+					var currHours = currDate.getHours()
+					if(currDay == 0 || currDay == 6){
+					  skip++
+					}
+					if(currHours > 16){
+					  afternoon++
+					}
+					if ((getCalendarWeek(currDate) + skip) % 2 === 0) calendarWeek = 0;
 					var dbLessonData = JSON.parse(Http.responseText)
-					if(getCalendarWeek(new Date()) % 2 === 0){
+					if(calendarWeek == 0){
 						dbLessonData = dbLessonData.EvenWeek
 					}else{
 						dbLessonData = dbLessonData.OddWeek
