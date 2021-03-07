@@ -81,23 +81,23 @@
 
 		function populateDay(day, data){
 			
-			day.appendChild(createEvent("07:30", "09:00", data[0].Subject, getColor(data[0].Subject)))
+			day.appendChild(createEvent("07:30", "09:00", `${data[0].Subject} - ${data[0].Room}`, getColor(data[0].Subject)))
 
 			day.appendChild(createEvent("09:00", "09:15", "Pause", "pause"))
 
-			day.appendChild(createEvent("09:15", "10:45", data[3].Subject, getColor(data[3].Subject)))
+			day.appendChild(createEvent("09:15", "10:45", `${data[3].Subject} - ${data[3].Room}`, getColor(data[3].Subject)))
 
 			day.appendChild(createEvent("10:45", "11:00", "Pause", "pause"))
 
-			day.appendChild(createEvent("11:00", "12:30", data[5].Subject, getColor(data[5].Subject)))
+			day.appendChild(createEvent("11:00", "12:30", `${data[5].Subject} - ${data[5].Room}`, getColor(data[5].Subject)))
 
 			day.appendChild(createEvent("12:30", "12:45", "Pause", "pause"))
 			
-			day.appendChild(createEvent("12:45", "14:15", data[7].Subject, getColor(data[7].Subject)))
+			day.appendChild(createEvent("12:45", "14:15", `${data[7].Subject} - ${data[7].Room}`, getColor(data[7].Subject)))
 
 			day.appendChild(createEvent("14:15", "14:30", "Pause", "pause"))
 
-			day.appendChild(createEvent("14:30", "16:00", data[9].Subject, getColor(data[9].Subject)))
+			day.appendChild(createEvent("14:30", "16:00", `${data[9].Subject} - ${data[9].Room}`, getColor(data[9].Subject)))
 		}
 
 		const Http = new XMLHttpRequest();
@@ -108,8 +108,21 @@
 		Http.onreadystatechange = (e) => {
 			if (Http.readyState === XMLHttpRequest.DONE) {
 				if (Http.status === 200) {
+					var afternoon = 0
+					let skip = 0
+					let currDate = new Date();
+					let calendarWeek = 1;
+					let currDay = currDate.getDay()
+					var currHours = currDate.getHours()
+					if(currDay == 0 || currDay == 6){
+					  skip++
+					}
+					if(currHours > 16){
+					  afternoon++
+					}
+					if ((getCalendarWeek(currDate) + skip) % 2 === 0) calendarWeek = 0;
 					var dbLessonData = JSON.parse(Http.responseText)
-					if(getCalendarWeek(new Date()) % 2 === 0){
+					if(calendarWeek == 0){
 						dbLessonData = dbLessonData.EvenWeek
 					}else{
 						dbLessonData = dbLessonData.OddWeek
