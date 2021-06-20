@@ -1,13 +1,11 @@
 import datetime
 import json
 import mysql.connector
-import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.chrome.options import Options
-from mysql.connector.errors import IntegrityError
 
 class bktSTD:
 
@@ -40,6 +38,11 @@ class bktSTD:
                if(room[1] == text):
                    returnVal = room[0]
        return returnVal
+    
+    def readJSON(self, fileName):
+        jsonFile = open(fileName + ".json")
+        return json.load(jsonFile)
+
 #endregion
 
     def checkForMissingRoomsOrSubjects(self):
@@ -253,17 +256,22 @@ class bktSTD:
 
     def login(self):
         self.driver.get("https://stdplan.bkt-luedenscheid.de/")
-        loginUsername = self.driver.find_element_by_name("username")
-        loginPassword = self.driver.find_element_by_name("password")
-        loginUsername.send_keys("jan.grosse_juettermann.gost91")
-        # region pw
-        loginPassword.send_keys("8t7uzer49")
-        # endregion
-        loginPassword.send_keys(Keys.RETURN)
+        usernameInput = self.driver.find_element_by_name("username")
+        passwordInput = self.driver.find_element_by_name("password")
+        usernameInput.send_keys(self.config["username"])
+        passwordInput.send_keys(self.config["password"])
+        passwordInput.send_keys(Keys.RETURN)
 
     def __init__(self):
+
+        self.lessons = [[[], [], [], [], []], [[], [], [], [], []]]
+        self.dbRooms = []
+        self.dbSubjects = []
+
+        self.config = self.readJSON("config");  
+
         chrome_options = Options()  
-        chrome_options.add_argument("--headless")
+        #chrome_options.add_argument("--headless")
         chrome_options.add_argument('log-level=3')
         
         #on desktop
@@ -273,13 +281,10 @@ class bktSTD:
         #chrome_options.add_argument('--no-sandbox')
         #chrome_options.add_argument('--disable-dev-shm-usage')
         #self.driver = webdriver.Chrome('/usr/bin/chromedriver', chrome_options=chrome_options)
-            
+
+         
         self.login()
-
-        self.lessons = [[[], [], [], [], []], [[], [], [], [], []]]
-        self.dbRooms = []
-        self.dbSubjects = []
-
+        
         self.calendarWeek = self.getCalendarWeek()
         
         print("Parsing first week...")
@@ -320,6 +325,8 @@ class bktSTD:
 
 
 bktSTD()
-while(True):
+
+
+""" while(True):
     time.sleep(28800)
-    bktSTD()
+    bktSTD() """
